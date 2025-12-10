@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  api:
+    build: ./api
+    container_name: k8s-ai-agent-api
+    ports:
+      - "8000:8000"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    volumes:
+      - ~/.kube:/root/.kube:ro  # Mount kubeconfig for kubectl access
+    networks:
+      - ai-agent-network
+    restart: unless-stopped
+
+  ui:
+    build: ./ui
+    container_name: k8s-ai-agent-ui
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - ai-agent-network
+    restart: unless-stopped
+
+networks:
+  ai-agent-network:
+    driver: bridge
