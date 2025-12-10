@@ -8,8 +8,14 @@ services:
       - "8000:8000"
     environment:
       - GROQ_API_KEY=${GROQ_API_KEY}
+      - KUBERNETES_SERVICE_HOST=host.docker.internal
+      - REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+      - CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+      - SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
     volumes:
-      - ~/.kube:/root/.kube:ro  # Mount kubeconfig for kubectl access
+      - ~/.kube:/root/.kube:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - ai-agent-network
     restart: unless-stopped

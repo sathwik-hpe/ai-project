@@ -2,6 +2,57 @@
 K8s AI Agent - ReAct Pattern with Groq
 Intelligent Kubernetes troubleshooting using LLMs and kubectl tools
 """
+
+# ============================================================================
+# SSL/TLS WORKAROUNDS FOR DOCKER DESKTOP MAC
+# ============================================================================
+# Docker Desktop for Mac has issues with SSL certificate verification when
+# accessing external APIs (like Groq) from containers. These workarounds
+# disable SSL verification to allow the agent to function properly.
+#
+# WARNING: Only use in development/demo environments with trusted APIs.
+# For production, configure proper SSL certificates.
+# ============================================================================
+
+# MUST be set before any imports - configures Python's SSL behavior
+import os
+os.environ['PYTHONHTTPSVERIFY'] = '0'  # Disable SSL verification globally
+os.environ['CURL_CA_BUNDLE'] = ''       # Prevent curl from using CA bundle
+os.environ['REQUESTS_CA_BUNDLE'] = ''   # Prevent requests library from using CA bundle
+
+import ssl
+import warnings
+import urllib3
+
+# Disable SSL verification warnings to clean up logs
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+warnings.filterwarnings('ignore', message='Unverified HTTPS request')
+
+# Override Python's default SSL context to not verify certificates
+ssl._create_default_https_context = ssl._create_unverified_context
+
+# ============================================================================
+# HTTPX MONKEYPATCH - CRITICAL FOR GROQ API
+# ============================================================================
+# The Groq Python SDK uses httpx (not requests) for HTTP connections.
+# We must monkeypatch httpx.Client to disable SSL verification.
+# This is done by intercepting the __init__ method and forcing verify=False.
+# ============================================================================
+import httpx
+_original_client_init = httpx.Client.__init__
+
+def _patched_client_init(self, *args, **kwargs):
+    """Patched httpx.Client.__init__ that forces SSL verification off"""
+    kwargs['verify'] = False  # Disable SSL verification
+    return _original_client_init(self, *args, **kwargs)
+
+httpx.Client.__init__ = _patched_client_init  # Apply the monkey patch
+
+# ============================================================================
+# NOW SAFE TO IMPORT OTHER MODULES
+# ============================================================================
+httpx.Client.__init__ = _patched_client_init
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,7 +63,6 @@ from langchain_groq import ChatGroq
 import subprocess
 import json as json_module
 import logging
-import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
